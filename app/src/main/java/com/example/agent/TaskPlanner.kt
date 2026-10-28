@@ -130,6 +130,42 @@ class TaskPlanner(
                 )
             }
 
+            is ParsedVoiceCommand.Scroll -> {
+                steps.add(
+                    PlanStep(
+                        stepId = "step_scroll_1",
+                        description = if (parsed.scrollUp) "Scroll screen up" else "Scroll screen down",
+                        toolName = "accessibility_scroll",
+                        parameters = mapOf("scroll_up" to parsed.scrollUp.toString()),
+                        riskLevel = StepRiskLevel.LOW
+                    )
+                )
+            }
+
+            is ParsedVoiceCommand.Tap -> {
+                steps.add(
+                    PlanStep(
+                        stepId = "step_tap_1",
+                        description = "Tap on \"${parsed.label}\"",
+                        toolName = "accessibility_tap",
+                        parameters = mapOf("label" to parsed.label),
+                        riskLevel = StepRiskLevel.LOW
+                    )
+                )
+            }
+
+            is ParsedVoiceCommand.GoBack -> {
+                steps.add(
+                    PlanStep(
+                        stepId = "step_back_1",
+                        description = "Perform back navigation",
+                        toolName = "accessibility_back",
+                        parameters = emptyMap(),
+                        riskLevel = StepRiskLevel.LOW
+                    )
+                )
+            }
+
             is ParsedVoiceCommand.AnswerInLanguage -> {
                 steps.add(
                     PlanStep(

@@ -15,6 +15,7 @@ import com.example.commands.VoiceCommandParser
 import com.example.data.repository.AppSettings
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -224,5 +225,27 @@ class VoiceAutomationCommandsTest {
         val settings = AppSettings(aiModel = "OpenCode Assistant", openCodeApiKey = "opencode-key")
         val resolved = factory.getProvider(settings, hasDefaultGeminiKey = false)
         assertEquals("opencode", resolved.providerId)
+    }
+
+    // Accessibility Automation Tests
+    @Test
+    fun `test accessibility scroll up and down commands`() {
+        val parsedUp = parser.parse("screen scroll up karo")
+        assertTrue(parsedUp is ParsedVoiceCommand.Scroll)
+        assertTrue((parsedUp as ParsedVoiceCommand.Scroll).scrollUp)
+
+        val parsedDown = parser.parse("is page ko neeche scroll karo")
+        assertTrue(parsedDown is ParsedVoiceCommand.Scroll)
+        assertFalse((parsedDown as ParsedVoiceCommand.Scroll).scrollUp)
+    }
+
+    @Test
+    fun `test accessibility tap and go back commands`() {
+        val parsedTap = parser.parse("pehli video par tap karo")
+        assertTrue(parsedTap is ParsedVoiceCommand.Tap)
+        assertEquals("video", (parsedTap as ParsedVoiceCommand.Tap).label)
+
+        val parsedBack = parser.parse("wapas jao")
+        assertTrue(parsedBack is ParsedVoiceCommand.GoBack)
     }
 }

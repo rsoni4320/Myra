@@ -8,6 +8,9 @@ sealed class ParsedVoiceCommand {
     data class OpenUrl(val url: String) : ParsedVoiceCommand()
     data class SetTimer(val durationSeconds: Int, val rawText: String) : ParsedVoiceCommand()
     data class SetAlarm(val hour: Int, val minute: Int, val rawText: String) : ParsedVoiceCommand()
+    data class Scroll(val scrollUp: Boolean) : ParsedVoiceCommand()
+    data class Tap(val label: String) : ParsedVoiceCommand()
+    object GoBack : ParsedVoiceCommand()
     object StopSpeaking : ParsedVoiceCommand()
     data class AnswerInLanguage(val targetLanguage: String, val prompt: String) : ParsedVoiceCommand()
     data class Conversational(val text: String) : ParsedVoiceCommand()
@@ -65,6 +68,12 @@ class VoiceCommandParser {
         val urlCommand = matchUrlCommand(raw, lower)
         if (urlCommand != null) {
             return urlCommand
+        }
+
+        // 6.5 Accessibility Automation Commands (Scroll, Tap, Go Back)
+        val automationCommand = matchAutomationCommand(raw, lower)
+        if (automationCommand != null) {
+            return automationCommand
         }
 
         // 7. App Launch Commands (English, Hindi, Hinglish)
@@ -251,6 +260,42 @@ class VoiceCommandParser {
         val directApp = resolveAppKey(lower)
         if (directApp != null) {
             return ParsedVoiceCommand.LaunchApp(directApp, lower)
+        }
+
+        return null
+    }
+
+    private fun matchAutomationCommand(raw: String, lower: String): ParsedVoiceCommand? {
+        // Go back
+        if (lower.contains("go back") || lower.contains("wapas jao") || lower.contains("peeche jao") || lower.contains("back jao")) {
+            return ParsedVoiceCommand.GoBack
+        }
+
+        // Scroll up
+        if (lower.contains("scroll up") || lower.contains("upar scroll") || lower.contains("upar jao") || lower.contains("scroll upper")) {
+            return ParsedVoiceCommand.Scroll(scrollUp = true)
+        }
+
+        // Scroll down
+        if (lower.contains("scroll down") || lower.contains("neche scroll") || lower.contains("neeche scroll") || lower.contains("neche jao")) {
+            return ParsedVoiceCommand.Scroll(scrollUp = false)
+        }
+
+        // Tap / Click on element or video
+        val tapPattern = Regex("(?i)(?:tap\\s+(?:on\\s+)?|click\\s+(?:on\\s+)?|par\\s+tap\\s+karo|par\\s+click\\s+karo)\\s+(.*)")
+        val matchTap = tapPattern.find(raw)
+        if (matchTap != null) {
+            val label = matchTap.groupValues[1].trim().removeSuffix("karo").trim()
+            if (label.isNotEmpty()) {
+                return ParsedVoiceCommand.Tap(label)
+            }
+        }
+
+        if (lower.contains("pehli video") || lower.contains("first video")) {
+            return ParsedVoiceCommand.Tap("video")
+        }
+        if (lower.contains("doosri video") || lower.contains("second video")) {
+            return ParsedVoiceCommand.Tap("video")
         }
 
         return null

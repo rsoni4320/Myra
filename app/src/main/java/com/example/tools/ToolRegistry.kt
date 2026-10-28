@@ -321,6 +321,90 @@ class NoteTool : AssistantTool {
     }
 }
 
+class AccessibilityScrollTool : AssistantTool {
+    override val id: String = "accessibility_scroll"
+    override val name: String = "Accessibility Scroll"
+    override val description: String = "Scrolls active screen up or down via Accessibility Service."
+    override val parameterHelp: String = "scroll_up: true or false"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val scrollUp = args["scroll_up"]?.toBoolean() ?: false
+        val service = com.example.service.MyraAccessibilityService.instance
+        if (service == null) {
+            return@withContext ToolResult.Error("Accessibility Service is not enabled. Please enable Maya Accessibility in Android Settings.")
+        }
+        val success = service.performScroll(scrollUp)
+        if (success) {
+            ToolResult.Success(if (scrollUp) "Scrolled up." else "Scrolled down.")
+        } else {
+            ToolResult.Error("Could not scroll on current screen.")
+        }
+    }
+}
+
+class AccessibilityTapTool : AssistantTool {
+    override val id: String = "accessibility_tap"
+    override val name: String = "Accessibility Tap"
+    override val description: String = "Taps visible element by label via Accessibility Service."
+    override val parameterHelp: String = "label: text or button label"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val label = args["label"]?.trim().orEmpty()
+        if (label.isEmpty()) return@withContext ToolResult.Error("No element label specified to tap.")
+        val service = com.example.service.MyraAccessibilityService.instance
+        if (service == null) {
+            return@withContext ToolResult.Error("Accessibility Service is not enabled. Please enable Maya Accessibility in Android Settings.")
+        }
+        val success = service.performTapByLabel(label)
+        if (success) {
+            ToolResult.Success("Tapped on \"$label\".")
+        } else {
+            ToolResult.Error("Could not find or tap element \"$label\" on screen.")
+        }
+    }
+}
+
+class AccessibilityBackTool : AssistantTool {
+    override val id: String = "accessibility_back"
+    override val name: String = "Accessibility Back"
+    override val description: String = "Performs global Back action via Accessibility Service."
+    override val parameterHelp: String = "none"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val service = com.example.service.MyraAccessibilityService.instance
+        if (service == null) {
+            return@withContext ToolResult.Error("Accessibility Service is not enabled.")
+        }
+        val success = service.goBack()
+        if (success) {
+            ToolResult.Success("Went back.")
+        } else {
+            ToolResult.Error("Could not perform back navigation.")
+        }
+    }
+}
+
 class ToolRegistry(
     private val context: Context,
     private val dao: MayaDao
@@ -337,6 +421,9 @@ class ToolRegistry(
         SystemTimerTool(),
         SystemAlarmTool(),
         StopSpeechTool(),
+        AccessibilityScrollTool(),
+        AccessibilityTapTool(),
+        AccessibilityBackTool(),
         WebSearchTool(client),
         MemoryStoreTool(),
         ReminderTool(),
