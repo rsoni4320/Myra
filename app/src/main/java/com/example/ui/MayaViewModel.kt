@@ -1,18 +1,25 @@
 package com.example.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
+import com.example.agent.PlanStep
 import com.example.ai.AiEngine
 import com.example.ai.AiResult
+import com.example.ai.GeminiProvider
+import com.example.ai.LiveSessionListener
+import com.example.ai.LiveVoiceSession
 import com.example.data.db.MayaDatabase
 import com.example.data.model.ChatMessage
 import com.example.data.model.ChatSession
+import com.example.data.model.MemoryItem
 import com.example.data.model.Note
 import com.example.data.model.Reminder
 import com.example.data.repository.AppSettings
 import com.example.data.repository.SettingsRepository
+import com.example.tools.ToolRegistry
 import com.example.voice.VoiceManager
 import com.example.voice.VoiceState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,9 +28,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 
 enum class ScreenDestination {
@@ -38,7 +42,8 @@ enum class ScreenDestination {
     ALARMS_TIMERS,
     AI_TOOLS,
     HELP_SUPPORT,
-    ABOUT_MAYA
+    ABOUT_MAYA,
+    PRIVACY_MEMORY
 }
 
 class MayaViewModel(application: Application) : AndroidViewModel(application) {
@@ -51,7 +56,9 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = db.mayaDao()
     private val settingsRepo = SettingsRepository(application)
-    private val aiEngine = AiEngine()
+    private val toolRegistry = ToolRegistry(application, dao)
+    private val aiEngine = AiEngine(toolRegistry, dao)
+    private val geminiProvider = GeminiProvider()
 
     val settings: StateFlow<AppSettings> = settingsRepo.settings
 
@@ -72,6 +79,18 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _mayaResponseText = MutableStateFlow("")
     val mayaResponseText: StateFlow<String> = _mayaResponseText.asStateFlow()
+
+    // Confirmation state for sensitive/destructive actions
+    private val _pendingConfirmationStep = MutableStateFlow<PlanStep?>(null)
+    val pendingConfirmationStep: StateFlow<PlanStep?> = _pendingConfirmationStep.asStateFlow()
+
+    private val _pendingConfirmationWarning = MutableStateFlow<String?>(null)
+    val pendingConfirmationWarning: StateFlow<String?> = _pendingConfirmationWarning.asStateFlow()
+
+    // Live Voice Session state
+    private var activeLiveSession: LiveVoiceSession? = null
+    private val _isLiveConnected = MutableStateFlow(false)
+    val isLiveConnected: StateFlow<Boolean> = _isLiveConnected.asStateFlow()
 
     // Voice Manager
     val voiceManager = VoiceManager(
@@ -99,6 +118,9 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val notes: StateFlow<List<Note>> = dao.getAllNotes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val memories: StateFlow<List<MemoryItem>> = dao.getAllMemories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
@@ -150,7 +172,12 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun onUserSpeechResult(prompt: String) {
+    fun stopSpeaking() {
+        voiceManager.stopSpeaking()
+        activeLiveSession?.interrupt()
+    }
+
+    fun onUserSpeechResult(prompt: String, isConfirmed: Boolean = false) {
         if (prompt.isBlank()) return
         _userSpokenText.value = prompt
 
@@ -176,30 +203,17 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
 
-            // Automatic intent detection for reminders and notes
-            val lower = prompt.lowercase(Locale.ROOT)
-            if (lower.startsWith("remind me to") || lower.startsWith("reminder:") || lower.contains("set reminder")) {
-                val remTitle = prompt.replace(Regex("(?i)(remind me to|set a reminder to|set reminder)"), "").trim()
-                if (remTitle.isNotBlank()) {
-                    val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-                    dao.insertReminder(Reminder(title = remTitle, timeLabel = timeStr))
-                }
-            } else if (lower.startsWith("note:") || lower.startsWith("take note") || lower.startsWith("note down")) {
-                val noteBody = prompt.replace(Regex("(?i)(note:|take a note|take note|note down)"), "").trim()
-                if (noteBody.isNotBlank()) {
-                    val noteTitle = if (noteBody.length > 20) noteBody.take(20) + "..." else "Quick Note"
-                    dao.insertNote(Note(title = noteTitle, content = noteBody))
-                }
-            }
-
-            // Get conversation history
+            // Get conversation history & memories
             val history = _messages.value.map { it.sender to it.content }
+            val currentMemories = memories.value
 
-            // Generate AI response
-            when (val result = aiEngine.generateResponse(prompt, settings.value, history)) {
+            // Generate AI response with safe runtime
+            when (val result = aiEngine.generateResponse(prompt, settings.value, history, currentMemories, isConfirmed)) {
                 is AiResult.Success -> {
                     val responseText = result.responseText
                     _mayaResponseText.value = responseText
+                    _pendingConfirmationStep.value = null
+                    _pendingConfirmationWarning.value = null
 
                     // Insert Maya message
                     val mayaMsg = ChatMessage(
@@ -213,6 +227,13 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
                     // Speak out response
                     voiceManager.speak(responseText, settings.value)
                 }
+
+                is AiResult.ConfirmationRequired -> {
+                    _pendingConfirmationStep.value = result.step
+                    _pendingConfirmationWarning.value = result.warning
+                    _mayaResponseText.value = result.warning
+                }
+
                 is AiResult.Error -> {
                     _errorMessage.value = result.errorMessage
                     _mayaResponseText.value = result.fallbackText
@@ -222,8 +243,42 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun confirmPendingAction() {
+        val step = _pendingConfirmationStep.value ?: return
+        val originalPrompt = _userSpokenText.value
+        _pendingConfirmationStep.value = null
+        _pendingConfirmationWarning.value = null
+        onUserSpeechResult(originalPrompt, isConfirmed = true)
+    }
+
+    fun cancelPendingAction() {
+        _pendingConfirmationStep.value = null
+        _pendingConfirmationWarning.value = null
+        _mayaResponseText.value = "Action was cancelled."
+    }
+
     fun sendTextMessage(text: String) {
         onUserSpeechResult(text)
+    }
+
+    fun analyzeSelectedImage(uri: Uri) {
+        if (!settings.value.imageUnderstanding) {
+            _errorMessage.value = "Image Understanding is disabled in AI Settings."
+            return
+        }
+        val prompt = "Analyze this image and describe what you see."
+        _userSpokenText.value = "[Selected Image Analysis]"
+        onUserSpeechResult(prompt)
+    }
+
+    fun readSelectedDocument(fileName: String, contentSnippet: String) {
+        if (!settings.value.documentReading) {
+            _errorMessage.value = "Document Reading is disabled in AI Settings."
+            return
+        }
+        val prompt = "Read document '$fileName': $contentSnippet"
+        _userSpokenText.value = "[Document: $fileName]"
+        onUserSpeechResult(prompt)
     }
 
     fun startNewChat() {
@@ -265,6 +320,15 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun getExportedChatText(): String {
+        val list = _messages.value
+        val sb = StringBuilder("=== Maya Assistant Chat Export ===\n\n")
+        for (msg in list) {
+            sb.append("[${msg.sender}]: ${msg.content}\n\n")
+        }
+        return sb.toString()
+    }
+
     // Reminders
     fun addReminder(title: String, timeLabel: String) {
         viewModelScope.launch {
@@ -297,6 +361,25 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // User Memory
+    fun addMemory(fact: String) {
+        viewModelScope.launch {
+            dao.insertMemory(MemoryItem(fact = fact, category = "Manual Entry"))
+        }
+    }
+
+    fun deleteMemory(id: Long) {
+        viewModelScope.launch {
+            dao.deleteMemory(id)
+        }
+    }
+
+    fun clearAllMemories() {
+        viewModelScope.launch {
+            dao.clearAllMemories()
+        }
+    }
+
     // Settings update
     fun updateSettings(newSettings: AppSettings) {
         settingsRepo.updateSettings(newSettings)
@@ -312,6 +395,7 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        activeLiveSession?.close()
         voiceManager.cleanup()
     }
 }

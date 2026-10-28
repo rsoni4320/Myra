@@ -43,12 +43,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ripple
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -98,6 +103,8 @@ fun HomeScreen(
     val mayaResponseText by viewModel.mayaResponseText.collectAsState()
     val liveTranscript by viewModel.liveTranscript.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val pendingConfirmationStep by viewModel.pendingConfirmationStep.collectAsState()
+    val pendingConfirmationWarning by viewModel.pendingConfirmationWarning.collectAsState()
 
     var showPermissionRationale by remember { mutableStateOf(false) }
 
@@ -354,8 +361,22 @@ fun HomeScreen(
                                 text = mayaResponseText,
                                 color = TextWhite,
                                 fontSize = 14.sp,
-                                lineHeight = 19.sp
+                                lineHeight = 19.sp,
+                                modifier = Modifier.weight(1f)
                             )
+                            if (voiceState == VoiceState.SPEAKING) {
+                                IconButton(
+                                    onClick = { viewModel.stopSpeaking() },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = "Stop Speech",
+                                        tint = MayaPurpleLight,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -529,6 +550,34 @@ fun HomeScreen(
                     modifier = Modifier.testTag("tap_to_speak_label")
                 )
             }
+        }
+
+        if (pendingConfirmationStep != null) {
+            AlertDialog(
+                onDismissRequest = { viewModel.cancelPendingAction() },
+                title = { Text("Confirm Action", color = TextWhite, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        text = pendingConfirmationWarning ?: "Are you sure you want to execute this action?",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 14.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.confirmPendingAction() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MayaPurple)
+                    ) {
+                        Text("Confirm")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.cancelPendingAction() }) {
+                        Text("Cancel", color = TextGray)
+                    }
+                },
+                containerColor = Color(0xFF0F1738)
+            )
         }
     }
 }

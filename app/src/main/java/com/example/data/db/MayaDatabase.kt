@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
 import androidx.room.Update
 import com.example.data.model.ChatMessage
 import com.example.data.model.ChatSession
+import com.example.data.model.MemoryItem
 import com.example.data.model.Note
 import com.example.data.model.Reminder
 import kotlinx.coroutines.flow.Flow
@@ -69,11 +70,27 @@ interface MayaDao {
 
     @Query("DELETE FROM notes")
     suspend fun clearAllNotes()
+
+    // User Memory (User-controlled memory store)
+    @Query("SELECT * FROM user_memory ORDER BY createdAt DESC")
+    fun getAllMemories(): Flow<List<MemoryItem>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMemory(memory: MemoryItem): Long
+
+    @Query("DELETE FROM user_memory WHERE id = :id")
+    suspend fun deleteMemory(id: Long)
+
+    @Query("DELETE FROM user_memory")
+    suspend fun clearAllMemories()
+
+    @Query("SELECT * FROM user_memory WHERE fact LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    fun searchMemories(query: String): Flow<List<MemoryItem>>
 }
 
 @Database(
-    entities = [ChatMessage::class, ChatSession::class, Reminder::class, Note::class],
-    version = 1,
+    entities = [ChatMessage::class, ChatSession::class, Reminder::class, Note::class, MemoryItem::class],
+    version = 2,
     exportSchema = false
 )
 abstract class MayaDatabase : RoomDatabase() {

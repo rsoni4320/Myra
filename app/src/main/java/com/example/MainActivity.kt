@@ -33,6 +33,7 @@ import com.example.ui.screens.HelpSupportScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.OtherSettingsScreen
+import com.example.ui.screens.PrivacyMemoryScreen
 import com.example.ui.screens.RemindersScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.VoiceSettingsScreen
@@ -131,6 +132,7 @@ fun MayaApp(
                 ScreenDestination.AI_TOOLS -> AiToolsScreen(viewModel = viewModel)
                 ScreenDestination.HELP_SUPPORT -> HelpSupportScreen(viewModel = viewModel)
                 ScreenDestination.ABOUT_MAYA -> AboutMayaScreen(viewModel = viewModel)
+                ScreenDestination.PRIVACY_MEMORY -> PrivacyMemoryScreen(viewModel = viewModel)
             }
         }
     }

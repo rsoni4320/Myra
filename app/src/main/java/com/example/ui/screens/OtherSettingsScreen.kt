@@ -151,7 +151,14 @@ fun OtherSettingsScreen(
                     icon = Icons.Outlined.Share,
                     label = "Export Chat",
                     onClick = {
-                        Toast.makeText(context, "Chat exported to local storage.", Toast.LENGTH_SHORT).show()
+                        val text = viewModel.getExportedChatText()
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, text)
+                            type = "text/plain"
+                        }
+                        val shareIntent = android.content.Intent.createChooser(sendIntent, "Export Maya Chat")
+                        context.startActivity(shareIntent)
                     },
                     testTag = "other_export_chat"
                 )
@@ -167,7 +174,7 @@ fun OtherSettingsScreen(
                     icon = Icons.Outlined.PrivacyTip,
                     label = "Privacy & Data",
                     onClick = {
-                        Toast.makeText(context, "Privacy: All conversations are stored privately on device.", Toast.LENGTH_LONG).show()
+                        viewModel.navigateTo(ScreenDestination.PRIVACY_MEMORY)
                     },
                     testTag = "other_privacy"
                 )

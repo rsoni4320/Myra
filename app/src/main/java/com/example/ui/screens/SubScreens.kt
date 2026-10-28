@@ -1,7 +1,12 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +28,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -70,6 +78,8 @@ import com.example.ui.theme.MayaPurple
 import com.example.ui.theme.MayaRed
 import com.example.ui.theme.TextGray
 import com.example.ui.theme.TextWhite
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -249,7 +259,7 @@ fun RemindersScreen(viewModel: MayaViewModel) {
         }
 
         if (showAddDialog) {
-            androidx.compose.material3.AlertDialog(
+            AlertDialog(
                 onDismissRequest = { showAddDialog = false },
                 title = { Text("New Reminder", color = TextWhite) },
                 text = {
@@ -384,7 +394,7 @@ fun NotesScreen(viewModel: MayaViewModel) {
         }
 
         if (showAddDialog) {
-            androidx.compose.material3.AlertDialog(
+            AlertDialog(
                 onDismissRequest = { showAddDialog = false },
                 title = { Text("New Note", color = TextWhite) },
                 text = {
@@ -536,18 +546,57 @@ fun AlarmsTimersScreen(viewModel: MayaViewModel) {
     }
 }
 
-// 5. AI TOOLS SCREEN
+// 5. AI TOOLS SCREEN (Multimodal, Code, Document & Translation)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiToolsScreen(viewModel: MayaViewModel) {
     BackHandler { viewModel.navigateBack() }
+    val context = LocalContext.current
+    val settings by viewModel.settings.collectAsState()
     var toolInput by remember { mutableStateOf("") }
-    var toolResult by remember { mutableStateOf("") }
+
+    // Photo picker (zero storage permissions)
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.analyzeSelectedImage(uri)
+            viewModel.navigateBack()
+            Toast.makeText(context, "Image selected for analysis", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Document picker (zero external leak)
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var fileName = "Document"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && nameIdx >= 0) {
+                        fileName = cursor.getString(nameIdx)
+                    }
+                }
+
+                val content = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BufferedReader(InputStreamReader(stream)).readLines().take(50).joinToString("\n")
+                }.orEmpty()
+
+                viewModel.readSelectedDocument(fileName, content)
+                viewModel.navigateBack()
+                Toast.makeText(context, "Document loaded safely on-device", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Could not read document: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI Tools", color = TextWhite, fontWeight = FontWeight.Bold) },
+                title = { Text("AI Tools & Intelligence", color = TextWhite, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextWhite)
@@ -567,16 +616,17 @@ fun AiToolsScreen(viewModel: MayaViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Instant Voice & Text AI Intelligence",
+                text = "Assistant Tools & Multimodal Workflows",
                 color = TextWhite,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
 
+            // Prompt Box
             OutlinedTextField(
                 value = toolInput,
                 onValueChange = { toolInput = it },
-                label = { Text("Enter text or question...") },
+                label = { Text("Prompt or question for Maya...") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextWhite,
@@ -586,6 +636,7 @@ fun AiToolsScreen(viewModel: MayaViewModel) {
                 minLines = 3
             )
 
+            // Text Tools
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -616,11 +667,261 @@ fun AiToolsScreen(viewModel: MayaViewModel) {
                     Text("Summarize", fontSize = 12.sp)
                 }
             }
+
+            // Web Search & Code Action
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (toolInput.isNotBlank()) {
+                            viewModel.sendTextMessage("Search: $toolInput")
+                            viewModel.navigateBack()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E284D))
+                ) {
+                    Icon(Icons.Outlined.Search, contentDescription = "Search", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Web Search", fontSize = 12.sp)
+                }
+
+                Button(
+                    onClick = {
+                        if (toolInput.isNotBlank()) {
+                            viewModel.sendTextMessage("Write code for: $toolInput")
+                            viewModel.navigateBack()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E284D))
+                ) {
+                    Icon(Icons.Default.Code, contentDescription = "Code", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Write Code", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Multimodal Section
+            Text(
+                text = "Multimodal & Document Analysis",
+                color = TextWhite,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
+
+            // Image Understanding Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MayaCardDark),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        if (settings.imageUnderstanding) {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        } else {
+                            Toast.makeText(context, "Image Understanding is disabled in AI Settings", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = "Image Analysis", tint = MayaPurple, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Analyze Image (Photo Picker)", color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("Pick an image without broad storage permissions", color = TextGray, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            // Document Reading Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MayaCardDark),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        if (settings.documentReading) {
+                            documentPickerLauncher.launch(arrayOf("text/plain", "application/pdf"))
+                        } else {
+                            Toast.makeText(context, "Document Reading is disabled in AI Settings", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Description, contentDescription = "Document Analysis", tint = MayaPurple, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Read Document (TXT/PDF)", color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("Inspects text locally without leaking files externally", color = TextGray, fontSize = 12.sp)
+                    }
+                }
+            }
         }
     }
 }
 
-// 6. HELP & SUPPORT SCREEN
+// 6. USER-CONTROLLED PRIVACY & MEMORY SCREEN
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PrivacyMemoryScreen(viewModel: MayaViewModel) {
+    BackHandler { viewModel.navigateBack() }
+    val memories by viewModel.memories.collectAsState()
+    var newFact by remember { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Privacy & Memory Store", color = TextWhite, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { viewModel.navigateBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextWhite)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MayaBackgroundDark)
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = MayaPurple,
+                contentColor = TextWhite
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Memory")
+            }
+        },
+        containerColor = MayaBackgroundDark
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MayaCardDark),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Lock, contentDescription = "Privacy", tint = MayaPurple, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "User-controlled memory is opt-in, stored strictly on-device in Room, and completely inspectable and deletable.",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+
+            if (memories.isEmpty()) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No personal memories stored yet.\nSay 'Remember that...' or tap + to add.", color = TextGray, fontSize = 14.sp)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Stored Memory Facts (${memories.size})", color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    TextButton(onClick = { viewModel.clearAllMemories() }) {
+                        Text("Clear All", color = MayaRed, fontSize = 13.sp)
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(memories, key = { it.id }) { memory ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MayaCardDark),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = memory.fact, color = TextWhite, fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(text = "${memory.category} • ${memory.source}", color = TextGray, fontSize = 11.sp)
+                                }
+                                IconButton(onClick = { viewModel.deleteMemory(memory.id) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextGray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showAddDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                title = { Text("Add Memory Fact", color = TextWhite) },
+                text = {
+                    OutlinedTextField(
+                        value = newFact,
+                        onValueChange = { newFact = it },
+                        label = { Text("Fact for Maya to remember") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextWhite,
+                            unfocusedTextColor = TextWhite,
+                            focusedBorderColor = MayaPurple
+                        ),
+                        singleLine = false,
+                        minLines = 2
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newFact.isNotBlank()) {
+                                viewModel.addMemory(newFact.trim())
+                                newFact = ""
+                                showAddDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MayaPurple)
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddDialog = false }) {
+                        Text("Cancel", color = TextGray)
+                    }
+                },
+                containerColor = MayaCardDark
+            )
+        }
+    }
+}
+
+// 7. HELP & SUPPORT SCREEN
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HelpSupportScreen(viewModel: MayaViewModel) {
@@ -693,7 +994,7 @@ private fun HelpCard(title: String, description: String) {
     }
 }
 
-// 7. ABOUT MAYA SCREEN
+// 8. ABOUT MAYA SCREEN
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutMayaScreen(viewModel: MayaViewModel) {
@@ -736,6 +1037,7 @@ fun AboutMayaScreen(viewModel: MayaViewModel) {
                     Text("• Voice Engine: Android SpeechRecognizer + TextToSpeech", color = TextWhite, fontSize = 13.sp)
                     Text("• Intelligence: Gemini AI Cloud Engine + Local Personality Engine", color = TextWhite, fontSize = 13.sp)
                     Text("• Multilingual: Native English and Hindi (हिंदी) processing", color = TextWhite, fontSize = 13.sp)
+                    Text("• Security: Zero hardcoded secrets, zero-permission Photo Picker", color = TextWhite, fontSize = 13.sp)
                 }
             }
         }

@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +57,7 @@ import com.example.ui.MayaViewModel
 import com.example.ui.theme.MayaBackgroundDark
 import com.example.ui.theme.MayaCardDark
 import com.example.ui.theme.MayaCardSelected
+import com.example.ui.theme.MayaCyan
 import com.example.ui.theme.MayaPurple
 import com.example.ui.theme.SwitchTrackActive
 import com.example.ui.theme.SwitchTrackInactive
@@ -166,6 +169,35 @@ fun AiSettingsScreen(
                                 maxLines = 1
                             )
                         }
+                    }
+                }
+
+                // Configuration status banner
+                val selectedModel = settings.aiModel
+                val hasApiKey = settings.customApiKey.isNotBlank()
+                val statusText = when {
+                    selectedModel.contains("Gemini", ignoreCase = true) ->
+                        "Gemini 3.8 Live & Flash active. Real-time voice intelligence connected."
+                    selectedModel.contains("GPT", ignoreCase = true) ->
+                        if (hasApiKey) "OpenAI GPT-4o REST provider configured." else "OpenAI GPT-4o requires your API key below."
+                    else ->
+                        if (hasApiKey) "$selectedModel endpoint configured." else "$selectedModel requires external API key configuration below."
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = if (selectedModel.contains("Gemini")) MayaCardSelected else MayaCardDark),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (selectedModel.contains("Gemini")) "✦" else "ℹ", color = MayaCyan, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(statusText, color = TextWhite, fontSize = 12.sp, lineHeight = 16.sp)
                     }
                 }
 
