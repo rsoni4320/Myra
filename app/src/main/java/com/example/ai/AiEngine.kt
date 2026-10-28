@@ -54,8 +54,19 @@ class AiEngine(
         // 1. Task Planning
         val plan = planner.createPlan(trimmedPrompt)
 
+        var forcedLanguage: String? = null
+
         // 2. Iterate through planned steps
         for (step in plan.steps) {
+            // Stop speech tool short-circuit
+            if (step.toolName == "stop_speech") {
+                return@withContext AiResult.Success("I stopped speaking.", toolUsed = "stop_speech")
+            }
+
+            if (step.toolName == "conversational_ai" && step.parameters.containsKey("target_language")) {
+                forcedLanguage = step.parameters["target_language"]
+            }
+
             // Policy Evaluation
             when (val eval = policyEngine.evaluateStep(step, isExplicitlyConfirmed)) {
                 is PolicyEvaluation.Blocked -> {
@@ -106,17 +117,15 @@ class AiEngine(
         }
 
         // 3. Conversational AI execution via configured Provider
-        val isHindi = trimmedPrompt.any { it.code in 0x0900..0x097F } ||
+        val isHindi = (forcedLanguage == "Hindi") ||
+                trimmedPrompt.any { it.code in 0x0900..0x097F } ||
                 settings.voiceLanguage.contains("Hindi", ignoreCase = true) ||
                 settings.language.contains("Hindi", ignoreCase = true)
 
-        val apiKey = when {
-            settings.customApiKey.isNotBlank() -> settings.customApiKey.trim()
-            tryGetBuildConfigApiKey().isNotBlank() -> tryGetBuildConfigApiKey()
-            else -> ""
-        }
+        val defaultGeminiKey = tryGetBuildConfigApiKey()
+        val provider = providerFactory.getProvider(settings, defaultGeminiKey.isNotBlank())
+        val apiKey = providerFactory.getActiveApiKey(settings, provider, defaultGeminiKey)
 
-        val provider = providerFactory.getProvider(settings.aiModel, apiKey.isNotBlank())
         val systemInstruction = buildPersona(settings, isHindi, memories)
         val maxTokens = when (settings.responseLength) {
             "Short" -> 160

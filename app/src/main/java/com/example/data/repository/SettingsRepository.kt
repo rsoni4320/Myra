@@ -30,7 +30,14 @@ data class AppSettings(
     val imageUnderstanding: Boolean = true,
     val documentReading: Boolean = true,
     val codeGeneration: Boolean = true,
-    val customApiKey: String = ""
+    val customApiKey: String = "",
+
+    // OpenRouter & OpenCode Providers
+    val openRouterApiKey: String = "",
+    val openRouterModel: String = "meta-llama/llama-3.3-70b-instruct:free",
+    val openCodeApiKey: String = "",
+    val openCodeEndpoint: String = "https://opencode.ai/api/v1",
+    val openCodeModel: String = "opencode-assistant"
 )
 
 class SettingsRepository(context: Context) {
@@ -60,7 +67,12 @@ class SettingsRepository(context: Context) {
             imageUnderstanding = prefs.getBoolean("imageUnderstanding", true),
             documentReading = prefs.getBoolean("documentReading", true),
             codeGeneration = prefs.getBoolean("codeGeneration", true),
-            customApiKey = prefs.getString("customApiKey", "") ?: ""
+            customApiKey = prefs.getString("customApiKey", "") ?: "",
+            openRouterApiKey = prefs.getString("openRouterApiKey", "") ?: "",
+            openRouterModel = prefs.getString("openRouterModel", "meta-llama/llama-3.3-70b-instruct:free") ?: "meta-llama/llama-3.3-70b-instruct:free",
+            openCodeApiKey = prefs.getString("openCodeApiKey", "") ?: "",
+            openCodeEndpoint = prefs.getString("openCodeEndpoint", "https://opencode.ai/api/v1") ?: "https://opencode.ai/api/v1",
+            openCodeModel = prefs.getString("openCodeModel", "opencode-assistant") ?: "opencode-assistant"
         )
     }
 
@@ -85,6 +97,11 @@ class SettingsRepository(context: Context) {
             putBoolean("documentReading", newSettings.documentReading)
             putBoolean("codeGeneration", newSettings.codeGeneration)
             putString("customApiKey", newSettings.customApiKey)
+            putString("openRouterApiKey", newSettings.openRouterApiKey)
+            putString("openRouterModel", newSettings.openRouterModel)
+            putString("openCodeApiKey", newSettings.openCodeApiKey)
+            putString("openCodeEndpoint", newSettings.openCodeEndpoint)
+            putString("openCodeModel", newSettings.openCodeModel)
             apply()
         }
         _settings.value = newSettings

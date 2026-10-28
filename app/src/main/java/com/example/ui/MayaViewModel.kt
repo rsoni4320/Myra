@@ -224,8 +224,12 @@ class MayaViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     dao.insertMessage(mayaMsg)
 
-                    // Speak out response
-                    voiceManager.speak(responseText, settings.value)
+                    // Speak out response unless interrupted
+                    if (result.toolUsed == "stop_speech") {
+                        stopSpeaking()
+                    } else {
+                        voiceManager.speak(responseText, settings.value)
+                    }
                 }
 
                 is AiResult.ConfirmationRequired -> {

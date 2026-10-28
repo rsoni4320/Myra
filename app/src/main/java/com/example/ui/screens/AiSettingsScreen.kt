@@ -78,6 +78,9 @@ fun AiSettingsScreen(
 
     val settings by viewModel.settings.collectAsState()
     var apiKeyInput by remember(settings.customApiKey) { mutableStateOf(settings.customApiKey) }
+    var openRouterKeyInput by remember(settings.openRouterApiKey) { mutableStateOf(settings.openRouterApiKey) }
+    var openCodeKeyInput by remember(settings.openCodeApiKey) { mutableStateOf(settings.openCodeApiKey) }
+    var openCodeEndpointInput by remember(settings.openCodeEndpoint) { mutableStateOf(settings.openCodeEndpoint) }
 
     Box(
         modifier = modifier
@@ -304,18 +307,124 @@ fun AiSettingsScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Optional Custom API Key input
+                // OpenRouter Configuration
                 Text(
-                    text = "Custom AI API Key (Optional)",
+                    text = "OpenRouter Provider",
                     color = TextWhite,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "You can enter your own Gemini or OpenAI API key, or leave blank to use the built-in system.",
+                    text = "Base URL: https://openrouter.ai/api/v1 (Llama 3.3, Gemini 2.0 Flash, DeepSeek)",
                     color = TextGray,
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
+                OutlinedTextField(
+                    value = openRouterKeyInput,
+                    onValueChange = {
+                        openRouterKeyInput = it
+                        viewModel.updateSettings(settings.copy(openRouterApiKey = it))
+                    },
+                    placeholder = { Text("Paste OpenRouter API Key (sk-or-...)", color = TextGray) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Outlined.Key, contentDescription = "OpenRouter Key", tint = MayaPurple)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("openrouter_api_key_input"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite,
+                        focusedBorderColor = MayaPurple,
+                        unfocusedBorderColor = Color(0xFF1E284D),
+                        focusedContainerColor = MayaCardDark,
+                        unfocusedContainerColor = MayaCardDark
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // OpenCode Configuration
+                Text(
+                    text = "OpenCode Provider",
+                    color = TextWhite,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Configurable endpoint for OpenCode-compatible inference services.",
+                    color = TextGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
+                OutlinedTextField(
+                    value = openCodeKeyInput,
+                    onValueChange = {
+                        openCodeKeyInput = it
+                        viewModel.updateSettings(settings.copy(openCodeApiKey = it))
+                    },
+                    placeholder = { Text("Paste OpenCode API Key...", color = TextGray) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Outlined.Key, contentDescription = "OpenCode Key", tint = MayaCyan)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("opencode_api_key_input"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite,
+                        focusedBorderColor = MayaCyan,
+                        unfocusedBorderColor = Color(0xFF1E284D),
+                        focusedContainerColor = MayaCardDark,
+                        unfocusedContainerColor = MayaCardDark
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = openCodeEndpointInput,
+                    onValueChange = {
+                        openCodeEndpointInput = it
+                        viewModel.updateSettings(settings.copy(openCodeEndpoint = it))
+                    },
+                    placeholder = { Text("Endpoint: https://opencode.ai/api/v1", color = TextGray) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("opencode_endpoint_input"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite,
+                        focusedBorderColor = MayaCyan,
+                        unfocusedBorderColor = Color(0xFF1E284D),
+                        focusedContainerColor = MayaCardDark,
+                        unfocusedContainerColor = MayaCardDark
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Optional Custom Gemini/OpenAI API Key input
+                Text(
+                    text = "Direct Gemini / OpenAI Key (Optional)",
+                    color = TextWhite,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Direct key for official Gemini or OpenAI endpoints.",
+                    color = TextGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
                 )
 
                 OutlinedTextField(
@@ -324,7 +433,7 @@ fun AiSettingsScreen(
                         apiKeyInput = it
                         viewModel.updateSettings(settings.copy(customApiKey = it))
                     },
-                    placeholder = { Text("Paste your API key here...", color = TextGray) },
+                    placeholder = { Text("Paste direct API key here...", color = TextGray) },
                     leadingIcon = {
                         Icon(imageVector = Icons.Outlined.Key, contentDescription = "API Key", tint = MayaPurple)
                     },

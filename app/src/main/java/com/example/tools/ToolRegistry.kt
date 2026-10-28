@@ -2,6 +2,8 @@ package com.example.tools
 
 import android.content.Context
 import android.util.Log
+import com.example.android.AndroidActionExecutor
+import com.example.android.AndroidExecutionResult
 import com.example.data.db.MayaDao
 import com.example.data.model.MemoryItem
 import com.example.data.model.Note
@@ -32,6 +34,158 @@ interface AssistantTool {
     val parameterHelp: String
     fun isEnabled(settings: AppSettings): Boolean
     suspend fun execute(args: Map<String, String>, context: Context, dao: MayaDao, settings: AppSettings): ToolResult
+}
+
+class AppLauncherTool : AssistantTool {
+    override val id: String = "app_launcher"
+    override val name: String = "App Launcher"
+    override val description: String = "Launches installed Android applications via package and category resolution."
+    override val parameterHelp: String = "app_key: normalized app key; raw_query: user utterance"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val appKey = args["app_key"] ?: "app"
+        val rawQuery = args["raw_query"] ?: appKey
+        val executor = AndroidActionExecutor(context)
+        when (val res = executor.launchApp(appKey, rawQuery)) {
+            is AndroidExecutionResult.Success -> ToolResult.Success(res.message, res.extraData)
+            is AndroidExecutionResult.Failure -> {
+                val msg = if (res.recoverySuggestion != null) "${res.error} ${res.recoverySuggestion}" else res.error
+                ToolResult.Error(msg, recoverable = true)
+            }
+        }
+    }
+}
+
+class WebBrowseTool : AssistantTool {
+    override val id: String = "web_search_action"
+    override val name: String = "Web Browse & Search"
+    override val description: String = "Opens user queries in the browser or opens explicit safe web links."
+    override val parameterHelp: String = "query: search text, or url: website link"
+
+    override fun isEnabled(settings: AppSettings): Boolean = settings.webSearch
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        if (!isEnabled(settings)) {
+            return@withContext ToolResult.Disabled("Web Search is disabled in AI Settings.")
+        }
+        val executor = AndroidActionExecutor(context)
+        val query = args["query"]
+        val url = args["url"]
+
+        if (!url.isNullOrBlank()) {
+            when (val res = executor.openUrl(url)) {
+                is AndroidExecutionResult.Success -> ToolResult.Success(res.message)
+                is AndroidExecutionResult.Failure -> ToolResult.Error(res.error)
+            }
+        } else if (!query.isNullOrBlank()) {
+            when (val res = executor.searchWeb(query)) {
+                is AndroidExecutionResult.Success -> ToolResult.Success(res.message)
+                is AndroidExecutionResult.Failure -> ToolResult.Error(res.error)
+            }
+        } else {
+            ToolResult.Error("No query or URL provided.")
+        }
+    }
+}
+
+class OpenUrlTool : AssistantTool {
+    override val id: String = "open_url"
+    override val name: String = "Open URL"
+    override val description: String = "Navigates to safe HTTPS/HTTP web URLs."
+    override val parameterHelp: String = "url: web link starting with http/https"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val executor = AndroidActionExecutor(context)
+        val url = args["url"].orEmpty()
+        when (val res = executor.openUrl(url)) {
+            is AndroidExecutionResult.Success -> ToolResult.Success(res.message)
+            is AndroidExecutionResult.Failure -> ToolResult.Error(res.error)
+        }
+    }
+}
+
+class SystemTimerTool : AssistantTool {
+    override val id: String = "system_timer"
+    override val name: String = "System Timer"
+    override val description: String = "Sets countdown timer using Android AlarmClock intent."
+    override val parameterHelp: String = "duration_seconds: integer seconds"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val seconds = args["duration_seconds"]?.toIntOrNull() ?: 60
+        val executor = AndroidActionExecutor(context)
+        when (val res = executor.setTimer(seconds)) {
+            is AndroidExecutionResult.Success -> ToolResult.Success(res.message)
+            is AndroidExecutionResult.Failure -> ToolResult.Error(res.error)
+        }
+    }
+}
+
+class SystemAlarmTool : AssistantTool {
+    override val id: String = "system_alarm"
+    override val name: String = "System Alarm"
+    override val description: String = "Sets system alarm using Android AlarmClock intent."
+    override val parameterHelp: String = "hour: 0-23, minute: 0-59"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val hour = args["hour"]?.toIntOrNull() ?: 7
+        val minute = args["minute"]?.toIntOrNull() ?: 0
+        val executor = AndroidActionExecutor(context)
+        when (val res = executor.setAlarm(hour, minute)) {
+            is AndroidExecutionResult.Success -> ToolResult.Success(res.message)
+            is AndroidExecutionResult.Failure -> ToolResult.Error(res.error)
+        }
+    }
+}
+
+class StopSpeechTool : AssistantTool {
+    override val id: String = "stop_speech"
+    override val name: String = "Stop Speech"
+    override val description: String = "Interrupts and cancels active voice synthesis."
+    override val parameterHelp: String = "none"
+
+    override fun isEnabled(settings: AppSettings): Boolean = true
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult {
+        return ToolResult.Success("Speech playback stopped.")
+    }
 }
 
 class WebSearchTool(private val client: OkHttpClient) : AssistantTool {
@@ -177,6 +331,12 @@ class ToolRegistry(
         .build()
 
     val tools: List<AssistantTool> = listOf(
+        AppLauncherTool(),
+        WebBrowseTool(),
+        OpenUrlTool(),
+        SystemTimerTool(),
+        SystemAlarmTool(),
+        StopSpeechTool(),
         WebSearchTool(client),
         MemoryStoreTool(),
         ReminderTool(),
