@@ -1,0 +1,6 @@
+{
+  "name": "Maya",
+  "description": "Native Android AI voice assistant featuring push-to-talk speech recognition, Gemini AI conversational intelligence, expressive text-to-speech, and customizable voice and AI settings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
