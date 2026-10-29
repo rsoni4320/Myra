@@ -37,7 +37,10 @@ data class AppSettings(
     val openRouterModel: String = "meta-llama/llama-3.3-70b-instruct:free",
     val openCodeApiKey: String = "",
     val openCodeEndpoint: String = "https://opencode.ai/api/v1",
-    val openCodeModel: String = "opencode-assistant"
+    val openCodeModel: String = "opencode-assistant",
+
+    // Phone & Unlock Security
+    val unlockPassword: String = ""
 )
 
 class SettingsRepository(context: Context) {
@@ -72,7 +75,8 @@ class SettingsRepository(context: Context) {
             openRouterModel = prefs.getString("openRouterModel", "meta-llama/llama-3.3-70b-instruct:free") ?: "meta-llama/llama-3.3-70b-instruct:free",
             openCodeApiKey = prefs.getString("openCodeApiKey", "") ?: "",
             openCodeEndpoint = prefs.getString("openCodeEndpoint", "https://opencode.ai/api/v1") ?: "https://opencode.ai/api/v1",
-            openCodeModel = prefs.getString("openCodeModel", "opencode-assistant") ?: "opencode-assistant"
+            openCodeModel = prefs.getString("openCodeModel", "opencode-assistant") ?: "opencode-assistant",
+            unlockPassword = prefs.getString("unlockPassword", "") ?: ""
         )
     }
 
@@ -102,6 +106,7 @@ class SettingsRepository(context: Context) {
             putString("openCodeApiKey", newSettings.openCodeApiKey)
             putString("openCodeEndpoint", newSettings.openCodeEndpoint)
             putString("openCodeModel", newSettings.openCodeModel)
+            putString("unlockPassword", newSettings.unlockPassword)
             apply()
         }
         _settings.value = newSettings

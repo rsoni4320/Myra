@@ -166,6 +166,18 @@ class TaskPlanner(
                 )
             }
 
+            is ParsedVoiceCommand.UnlockPhone -> {
+                steps.add(
+                    PlanStep(
+                        stepId = "step_unlock_1",
+                        description = "Unlock phone and enter configured password/PIN",
+                        toolName = "unlock_phone",
+                        parameters = emptyMap(),
+                        riskLevel = StepRiskLevel.MEDIUM
+                    )
+                )
+            }
+
             is ParsedVoiceCommand.AnswerInLanguage -> {
                 steps.add(
                     PlanStep(

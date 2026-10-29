@@ -81,6 +81,7 @@ fun AiSettingsScreen(
     var openRouterKeyInput by remember(settings.openRouterApiKey) { mutableStateOf(settings.openRouterApiKey) }
     var openCodeKeyInput by remember(settings.openCodeApiKey) { mutableStateOf(settings.openCodeApiKey) }
     var openCodeEndpointInput by remember(settings.openCodeEndpoint) { mutableStateOf(settings.openCodeEndpoint) }
+    var unlockPasswordInput by remember(settings.unlockPassword) { mutableStateOf(settings.unlockPassword) }
 
     Box(
         modifier = modifier
@@ -450,6 +451,48 @@ fun AiSettingsScreen(
                         unfocusedContainerColor = MayaCardDark
                     ),
                     singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Device Unlock Password / PIN for Phone Control Automation
+                Text(
+                    text = "Device Unlock Password / PIN",
+                    color = TextWhite,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Used when you ask Maya to unlock your phone or enter password.",
+                    color = TextGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+
+                OutlinedTextField(
+                    value = unlockPasswordInput,
+                    onValueChange = {
+                        unlockPasswordInput = it
+                        viewModel.updateSettings(settings.copy(unlockPassword = it))
+                    },
+                    placeholder = { Text("Enter lock screen password or PIN...", color = TextGray) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Outlined.Key, contentDescription = "Unlock Password", tint = MayaCyan)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("unlock_password_input"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextWhite,
+                        unfocusedTextColor = TextWhite,
+                        focusedBorderColor = MayaCyan,
+                        unfocusedBorderColor = Color(0xFF1E284D),
+                        focusedContainerColor = MayaCardDark,
+                        unfocusedContainerColor = MayaCardDark
+                    ),
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
                 )
 
                 Spacer(modifier = Modifier.height(30.dp))

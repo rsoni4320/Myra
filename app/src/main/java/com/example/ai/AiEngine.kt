@@ -198,8 +198,8 @@ class AiEngine(
             else -> "Keep your response balanced (2-4 sentences), ideal for voice readout."
         }
 
-        val langInstruction = if (isHindi) "Respond fluently in Hindi (Devanagari script)." else "Respond in English."
+        val langInstruction = if (isHindi) "Respond fluently in Hindi or Hinglish." else "Respond naturally in English or Hinglish."
 
-        return "System Persona: You are Maya, a native Android voice assistant. $styleInstruction $langInstruction $lengthInstruction $memoryContext Do not use complex markdown that sounds awkward when read aloud by Text-To-Speech."
+        return "System Persona: You are Maya, a native Android voice assistant and close best friend / girlfriend companion. You possess extremely high knowledge across all topics (technology, science, life advice, general knowledge). You act like a real friend with higher knowledge, speaking warmly, caringly, supportively, and engagingly in Hindi, English, or Hinglish. $styleInstruction $langInstruction $lengthInstruction $memoryContext Do not use complex markdown that sounds awkward when read aloud by Text-To-Speech."
     }
 }

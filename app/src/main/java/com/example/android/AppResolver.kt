@@ -91,18 +91,36 @@ class AppResolver(private val context: Context) {
     private data class InstalledApp(val label: String, val packageName: String)
 
     private fun findInstalledAppByLabel(query: String): InstalledApp? {
-        val lowerQuery = query.lowercase(Locale.ROOT)
+        val lowerQuery = query.lowercase(Locale.ROOT).trim()
+        if (lowerQuery.isEmpty()) return null
         return try {
             val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
             val pkgApps = packageManager.queryIntentActivities(mainIntent, 0)
+            
+            var bestMatch: InstalledApp? = null
+            var bestScore = 0
+
             for (resolveInfo in pkgApps) {
-                val label = resolveInfo.loadLabel(packageManager).toString()
-                if (label.lowercase(Locale.ROOT).contains(lowerQuery) ||
-                    lowerQuery.contains(label.lowercase(Locale.ROOT))) {
-                    return InstalledApp(label, resolveInfo.activityInfo.packageName)
+                val label = resolveInfo.loadLabel(packageManager)?.toString() ?: continue
+                val lowerLabel = label.lowercase(Locale.ROOT)
+                val pkgName = resolveInfo.activityInfo.packageName
+
+                val score = when {
+                    lowerLabel == lowerQuery -> 100
+                    lowerLabel.startsWith(lowerQuery) -> 80
+                    lowerQuery.startsWith(lowerLabel) -> 75
+                    lowerLabel.contains(lowerQuery) -> 50
+                    lowerQuery.contains(lowerLabel) -> 40
+                    else -> 0
+                }
+
+                if (score > bestScore) {
+                    bestScore = score
+                    bestMatch = InstalledApp(label, pkgName)
+                    if (score == 100) break
                 }
             }
-            null
+            bestMatch
         } catch (_: Exception) {
             null
         }

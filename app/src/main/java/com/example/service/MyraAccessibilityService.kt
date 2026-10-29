@@ -90,4 +90,36 @@ class MyraAccessibilityService : AccessibilityService() {
     fun goBack(): Boolean {
         return performGlobalAction(GLOBAL_ACTION_BACK)
     }
+
+    fun enterPassword(password: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val editable = findEditableNode(root)
+        if (editable != null) {
+            val args = android.os.Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, password)
+            }
+            val success = editable.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            editable.recycle()
+            root.recycle()
+            return success
+        }
+        root.recycle()
+        return false
+    }
+
+    private fun findEditableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isEditable || node.className?.toString()?.contains("EditText") == true) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findEditableNode(child)
+            if (found != null) {
+                node.recycle()
+                return found
+            }
+            child.recycle()
+        }
+        return null
+    }
 }

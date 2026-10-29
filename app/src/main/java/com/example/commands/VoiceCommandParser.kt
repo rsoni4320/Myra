@@ -12,6 +12,7 @@ sealed class ParsedVoiceCommand {
     data class Tap(val label: String) : ParsedVoiceCommand()
     object GoBack : ParsedVoiceCommand()
     object StopSpeaking : ParsedVoiceCommand()
+    object UnlockPhone : ParsedVoiceCommand()
     data class AnswerInLanguage(val targetLanguage: String, val prompt: String) : ParsedVoiceCommand()
     data class Conversational(val text: String) : ParsedVoiceCommand()
 }
@@ -266,6 +267,11 @@ class VoiceCommandParser {
     }
 
     private fun matchAutomationCommand(raw: String, lower: String): ParsedVoiceCommand? {
+        // Unlock phone / password
+        if (lower.contains("unlock phone") || lower.contains("enter password") || lower.contains("phone unlock") || lower.contains("password dalo") || lower.contains("phone kholo password") || lower.contains("unlock kardo")) {
+            return ParsedVoiceCommand.UnlockPhone
+        }
+
         // Go back
         if (lower.contains("go back") || lower.contains("wapas jao") || lower.contains("peeche jao") || lower.contains("back jao")) {
             return ParsedVoiceCommand.GoBack

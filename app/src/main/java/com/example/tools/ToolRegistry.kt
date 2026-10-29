@@ -405,6 +405,37 @@ class AccessibilityBackTool : AssistantTool {
     }
 }
 
+class UnlockPhoneTool : AssistantTool {
+    override val id: String = "unlock_phone"
+    override val name: String = "Unlock Phone & Enter Password"
+    override val description: String = "Enters configured unlock password or PIN via Accessibility Service."
+    override val parameterHelp: String = "none"
+
+    override fun isEnabled(settings: AppSettings): Boolean = settings.unlockPassword.isNotBlank()
+
+    override suspend fun execute(
+        args: Map<String, String>,
+        context: Context,
+        dao: MayaDao,
+        settings: AppSettings
+    ): ToolResult = withContext(Dispatchers.Main) {
+        val password = settings.unlockPassword
+        if (password.isBlank()) {
+            return@withContext ToolResult.Error("No unlock password / PIN is configured in AI Settings.")
+        }
+        val service = com.example.service.MyraAccessibilityService.instance
+        if (service == null) {
+            return@withContext ToolResult.Error("Accessibility Service is not enabled. Please enable Maya Accessibility in Android Settings.")
+        }
+        val success = service.enterPassword(password)
+        if (success) {
+            ToolResult.Success("Entered unlock password successfully.")
+        } else {
+            ToolResult.Error("Could not find password field on screen. Please ensure lock screen or password prompt is active.")
+        }
+    }
+}
+
 class ToolRegistry(
     private val context: Context,
     private val dao: MayaDao
@@ -424,6 +455,7 @@ class ToolRegistry(
         AccessibilityScrollTool(),
         AccessibilityTapTool(),
         AccessibilityBackTool(),
+        UnlockPhoneTool(),
         WebSearchTool(client),
         MemoryStoreTool(),
         ReminderTool(),
